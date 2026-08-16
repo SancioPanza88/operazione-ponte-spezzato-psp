@@ -54,7 +54,6 @@ static void enqueue(int type, float vol) {
 }
 
 void audio_init(void) {
-    sceAudioSetFrequency(PSP_AUDIO_FREQ_44K);
     g_chan = sceAudioChReserve(PSP_AUDIO_NEXT_CHANNEL, PSP_AUDIO_SAMPLE_ALIGN(SAMPLES), PSP_AUDIO_FORMAT_MONO);
     for (int i = 0; i < 8; i++) voices[i].len = 0;
 }
