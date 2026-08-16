@@ -1,0 +1,28 @@
+name: Build PSP EBOOT
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: pspdev/pspdev:latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure build tools
+        run: apk add --no-cache make || true
+
+      - name: Build EBOOT.PBP
+        run: make -C psp/src
+
+      - name: Upload EBOOT.PBP
+        uses: actions/upload-artifact@v4
+        with:
+          name: EBOOT.PBP
+          path: psp/src/EBOOT.PBP
+          if-no-files-found: warn
