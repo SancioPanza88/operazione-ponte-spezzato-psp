@@ -1,4 +1,5 @@
 #include "game.h"
+#include <pspaudio.h>
 
 #define SR 44100
 #define SAMPLES 512
