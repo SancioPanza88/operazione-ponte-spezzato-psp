@@ -37,7 +37,7 @@ static void fill_rect(int x, int y, int w, int h, unsigned int c) {
     if (y + h > SCR_HEIGHT) h = SCR_HEIGHT - y;
     if (w <= 0 || h <= 0) return;
     for (int j = y; j < y + h; j++) {
-        unsigned int* row = g_fb + j * BUF_WIDTH;
+        u32* row = g_fb + j * BUF_WIDTH;
         for (int i = x; i < x + w; i++) row[i] = c;
     }
 }
