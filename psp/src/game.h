@@ -45,7 +45,6 @@ typedef struct {
     float healRange, healRate;
     float auraRange, auraBoost;
     float maxAmmo;
-    float antiTankBonus;
     const char* label;
 } RoleDef;
 
@@ -60,6 +59,7 @@ typedef struct {
     int dead;
     float ammo;
     float maxAmmo;
+    float range, dps, speed;
     int order;
     float tx, ty;
     float shootCd;
@@ -142,6 +142,18 @@ typedef struct {
 } Particle;
 
 extern Particle particles[MAX_PARTICLES];
+
+typedef struct { unsigned char* data; int w, h; } Tex;
+extern Tex tex_tank[6];
+extern Tex tex_soldier[7];
+extern Tex tex_bridge[2];
+extern Tex tex_bunker[2];
+extern Tex tex_arty[2];
+extern Tex tex_hq[2];
+extern Tex tex_house;
+extern Tex tex_tree[2];
+void load_assets(void);
+void blit(const Tex* t, float cx, float cy, float scale, float ang, int alpha);
 
 void game_init(void);
 void game_new_battle(int playerFaction);

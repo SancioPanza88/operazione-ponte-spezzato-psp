@@ -33,6 +33,7 @@ int main(int argc, char* argv[]) {
     (void)argc; (void)argv;
     setupCallbacks();
     gfx_init();
+    load_assets();
     audio_init();
     game_init();
 

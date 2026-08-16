@@ -1,14 +1,14 @@
 #include "game.h"
 
 const RoleDef ROLE_DEFS[ROLE_COUNT] = {
-    { 120, 58, 90, 8, 0, 0, 0, 130, 0.25, 40, 0, "UFFICIALE" },
-    { 65, 38, 260, 16, 0.4f, 0, 0, 0, 0, 30, 0, "CECCHINO" },
-    { 90, 56, 40, 3, 0, 75, 7, 0, 0, 20, 0, "MEDICO" },
-    { 140, 34, 150, 15, 1.6f, 0, 0, 0, 0, 180, 0, "SUPPORTO" },
-    { 100, 60, 110, 10, 0, 0, 0, 0, 0, 60, 0, "SOLDATO" },
-    { 100, 52, 130, 7, 0.3f, 0, 0, 0, 0, 12, 9, "ANTICARRO" },
-    { 90, 56, 70, 5, 0, 0, 0, 0, 0, 32, 0, "MARCONISTA" },
-    { 420, 24, 220, 26, 0.8f, 0, 0, 0, 0, 1e9f, 0, "CARRO" },
+    { 120, 120, 55, 95, 9, 0, 0, 0, 130, 0.25, 40, "UFFICIALE" },
+    { 65, 65, 38, 260, 16, 0.4f, 0, 0, 0, 0, 30, "CECCHINO" },
+    { 90, 90, 56, 40, 3, 0, 75, 7, 0, 0, 20, "MEDICO" },
+    { 140, 140, 34, 150, 15, 1.6f, 0, 0, 0, 0, 180, "SUPPORTO" },
+    { 100, 100, 60, 110, 10, 0, 0, 0, 0, 0, 60, "SOLDATO" },
+    { 100, 100, 52, 130, 7, 0.3f, 0, 0, 0, 0, 12, "ANTICARRO" },
+    { 90, 90, 56, 70, 5, 0, 0, 0, 0, 0, 32, "MARCONISTA" },
+    { 420, 420, 24, 220, 26, 0.8f, 0, 0, 0, 0, 1000000.0f, "CARRO" },
 };
 
 typedef struct { const char* name; unsigned int color; unsigned int accent; int alliance; float sx, sy; } FacInfo;
@@ -326,6 +326,9 @@ static void damageMission(Mission* m, float dmg, int by) {
     m->hp -= dmg;
     if (m->hp <= 0) {
         m->hp = 0; m->destroyed = 1; m->destroyer = by;
+        if (m->kind == 1) for (int i = 0; i < world.nBunker; i++) if (!world.bunkers[i].destroyed && distf(world.bunkers[i].x, world.bunkers[i].y, m->cx, m->cy) < world.bunkers[i].r + 5) world.bunkers[i].destroyed = 1;
+        if (m->kind == 2) for (int i = 0; i < world.nArty; i++) if (!world.artillery[i].destroyed && distf(world.artillery[i].x, world.artillery[i].y, m->cx, m->cy) < world.artillery[i].r + 5) world.artillery[i].destroyed = 1;
+        if (m->kind == 3) for (int i = 0; i < world.nHq; i++) if (!world.hqs[i].destroyed && distf(world.hqs[i].x, world.hqs[i].y, m->cx, m->cy) < world.hqs[i].r + 5) world.hqs[i].destroyed = 1;
         add_explosion(m->cx, m->cy, 60);
         sfx_explosion();
         G.shake = (float)fmaxf(G.shake, 3.0f);
