@@ -1,6 +1,4 @@
 #include "game.h"
-#include <png.h>
-#include <setjmp.h>
 
 #define BUF_WIDTH 512
 #define SCR_WIDTH 480
@@ -156,68 +154,45 @@ static int onscreen(int sx, int sy, int m) {
     return !(sx < -m || sy < -m || sx > SCR_WIDTH + m || sy > SCR_HEIGHT + m);
 }
 
-static int load_png(const char* path, Tex* out) {
+static int load_rgba(const char* path, Tex* out) {
     out->data = 0; out->w = 0; out->h = 0;
     FILE* fp = fopen(path, "rb");
     if (!fp) return 0;
-    png_byte sig[8];
-    if (fread(sig, 1, 8, fp) != 8 || png_sig_cmp(sig, 0, 8)) { fclose(fp); return 0; }
-    png_structp png = png_create_read_struct(PNG_LIBPNG_VER_STRING, 0, 0, 0);
-    if (!png) { fclose(fp); return 0; }
-    png_infop info = png_create_info_struct(png);
-    if (!info) { png_destroy_read_struct(&png, 0, 0); fclose(fp); return 0; }
-    if (setjmp(png_jmpbuf(png))) { png_destroy_read_struct(&png, &info, 0); fclose(fp); return 0; }
-    png_init_io(png, fp);
-    png_set_sig_bytes(png, 8);
-    png_read_info(png, info);
-    png_uint_32 w, h; int depth, ct;
-    png_get_IHDR(png, info, &w, &h, &depth, &ct, 0, 0, 0);
-    png_set_expand(png);
-    png_set_strip_16(png);
-    png_set_gray_1_2_4_to_8(png);
-    png_set_tRNS_to_alpha(png);
-    if (ct != PNG_COLOR_TYPE_RGBA && ct != PNG_COLOR_TYPE_GRAY_ALPHA) png_set_add_alpha(png, 0xFF, PNG_FILLER_AFTER);
-    png_read_update_info(png, info);
-    png_uint_32 rb = png_get_rowbytes(png, info);
-    unsigned char* data = (unsigned char*)malloc((size_t)h * rb);
-    if (!data) { png_destroy_read_struct(&png, &info, 0); fclose(fp); return 0; }
-    png_bytep* rows = (png_bytep*)malloc(sizeof(png_bytep) * h);
-    if (!rows) { free(data); png_destroy_read_struct(&png, &info, 0); fclose(fp); return 0; }
-    for (png_uint_32 y = 0; y < h; y++) rows[y] = data + y * rb;
-    png_read_image(png, rows);
-    free(rows);
-    png_read_end(png, 0);
-    png_destroy_read_struct(&png, &info, 0);
+    unsigned int w = 0, h = 0;
+    if (fread(&w, 4, 1, fp) != 1 || fread(&h, 4, 1, fp) != 1) { fclose(fp); return 0; }
+    unsigned char* data = (unsigned char*)malloc((size_t)w * h * 4);
+    if (!data) { fclose(fp); return 0; }
+    if (fread(data, 1, (size_t)w * h * 4, fp) != (size_t)w * h * 4) { free(data); fclose(fp); return 0; }
     fclose(fp);
     out->w = (int)w; out->h = (int)h; out->data = data;
     return 1;
 }
 
 void load_assets(void) {
-    load_png("assets/tank_gb.png", &tex_tank[0]);
-    load_png("assets/tank_us.png", &tex_tank[1]);
-    load_png("assets/tank_su.png", &tex_tank[2]);
-    load_png("assets/tank_de.png", &tex_tank[3]);
-    load_png("assets/tank_jp.png", &tex_tank[4]);
-    load_png("assets/tank_npc.png", &tex_tank[5]);
-    load_png("assets/soldier_gb_officer.png", &tex_soldier[0]);
-    load_png("assets/soldier_gb_sniper.png", &tex_soldier[1]);
-    load_png("assets/soldier_gb_medic.png", &tex_soldier[2]);
-    load_png("assets/soldier_gb_support.png", &tex_soldier[3]);
-    load_png("assets/soldier_gb_soldier.png", &tex_soldier[4]);
-    load_png("assets/soldier_gb_antitank.png", &tex_soldier[5]);
-    load_png("assets/soldier_gb_radioman.png", &tex_soldier[6]);
-    load_png("assets/bridge.png", &tex_bridge[0]);
-    load_png("assets/bridge_dead.png", &tex_bridge[1]);
-    load_png("assets/bunker.png", &tex_bunker[0]);
-    load_png("assets/bunker_dead.png", &tex_bunker[1]);
-    load_png("assets/artillery.png", &tex_arty[0]);
-    load_png("assets/artillery_dead.png", &tex_arty[1]);
-    load_png("assets/hq.png", &tex_hq[0]);
-    load_png("assets/hq_dead.png", &tex_hq[1]);
-    load_png("assets/house_a.png", &tex_house);
-    load_png("assets/tree_a.png", &tex_tree[0]);
-    load_png("assets/tree_b.png", &tex_tree[1]);
+    load_rgba("assets/tank_gb.rgba", &tex_tank[0]);
+    load_rgba("assets/tank_us.rgba", &tex_tank[1]);
+    load_rgba("assets/tank_su.rgba", &tex_tank[2]);
+    load_rgba("assets/tank_de.rgba", &tex_tank[3]);
+    load_rgba("assets/tank_jp.rgba", &tex_tank[4]);
+    load_rgba("assets/tank_npc.rgba", &tex_tank[5]);
+    load_rgba("assets/soldier_gb_officer.rgba", &tex_soldier[0]);
+    load_rgba("assets/soldier_gb_sniper.rgba", &tex_soldier[1]);
+    load_rgba("assets/soldier_gb_medic.rgba", &tex_soldier[2]);
+    load_rgba("assets/soldier_gb_support.rgba", &tex_soldier[3]);
+    load_rgba("assets/soldier_gb_soldier.rgba", &tex_soldier[4]);
+    load_rgba("assets/soldier_gb_antitank.rgba", &tex_soldier[5]);
+    load_rgba("assets/soldier_gb_radioman.rgba", &tex_soldier[6]);
+    load_rgba("assets/bridge.rgba", &tex_bridge[0]);
+    load_rgba("assets/bridge_dead.rgba", &tex_bridge[1]);
+    load_rgba("assets/bunker.rgba", &tex_bunker[0]);
+    load_rgba("assets/bunker_dead.rgba", &tex_bunker[1]);
+    load_rgba("assets/artillery.rgba", &tex_arty[0]);
+    load_rgba("assets/artillery_dead.rgba", &tex_arty[1]);
+    load_rgba("assets/hq.rgba", &tex_hq[0]);
+    load_rgba("assets/hq_dead.rgba", &tex_hq[1]);
+    load_rgba("assets/house_a.rgba", &tex_house);
+    load_rgba("assets/tree_a.rgba", &tex_tree[0]);
+    load_rgba("assets/tree_b.rgba", &tex_tree[1]);
 }
 
 void blit(const Tex* t, float cx, float cy, float scale, float ang, int alpha) {

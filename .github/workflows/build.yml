@@ -15,7 +15,21 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Ensure build tools
-        run: apk add --no-cache make || true
+        run: apk add --no-cache make python3 py3-pillow || true
+
+      - name: Convert PNG assets to RGBA
+        run: |
+          python3 - <<'PY'
+          import glob, struct
+          from PIL import Image
+          for p in sorted(glob.glob('psp/assets/*.png')):
+              im = Image.open(p).convert('RGBA')
+              w, h = im.size
+              with open(p[:-4] + '.rgba', 'wb') as f:
+                  f.write(struct.pack('<II', w, h))
+                  f.write(im.tobytes())
+              print('converted', p, im.size)
+          PY
 
       - name: Build EBOOT.PBP
         run: make -C psp/src
