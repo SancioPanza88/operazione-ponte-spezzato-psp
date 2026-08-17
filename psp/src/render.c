@@ -7,9 +7,9 @@
 #define wsx(wx) ((int)(((wx) - G.camX) * G.zoom))
 #define wsy(wy) ((int)(((wy) - G.camY) * G.zoom))
 
-static unsigned int __attribute__((aligned(16))) gu_list[262144];
-static u32 __attribute__((aligned(16))) fb[2][BUF_WIDTH * SCR_HEIGHT];
-static u32* g_fb = fb[0];
+static unsigned int __attribute__((aligned(16))) gu_list[16384];
+static u32* vram_fb[2];
+static u32* g_fb = 0;
 static int g_draw = 0;
 
 Tex tex_tank[6];
@@ -156,13 +156,14 @@ static int onscreen(int sx, int sy, int m) {
 
 static int load_rgba(const char* path, Tex* out) {
     out->data = 0; out->w = 0; out->h = 0;
+    char tmp[96];
     FILE* fp = fopen(path, "rb");
-    if (!fp) return 0;
+    if (!fp) { sprintf(tmp, "MISSING %s", path); log_push(tmp); return 0; }
     unsigned int w = 0, h = 0;
-    if (fread(&w, 4, 1, fp) != 1 || fread(&h, 4, 1, fp) != 1) { fclose(fp); return 0; }
+    if (fread(&w, 4, 1, fp) != 1 || fread(&h, 4, 1, fp) != 1) { sprintf(tmp, "BAD %s", path); log_push(tmp); fclose(fp); return 0; }
     unsigned char* data = (unsigned char*)malloc((size_t)w * h * 4);
-    if (!data) { fclose(fp); return 0; }
-    if (fread(data, 1, (size_t)w * h * 4, fp) != (size_t)w * h * 4) { free(data); fclose(fp); return 0; }
+    if (!data) { sprintf(tmp, "OOM %s", path); log_push(tmp); fclose(fp); return 0; }
+    if (fread(data, 1, (size_t)w * h * 4, fp) != (size_t)w * h * 4) { free(data); sprintf(tmp, "TRUNC %s", path); log_push(tmp); fclose(fp); return 0; }
     fclose(fp);
     out->w = (int)w; out->h = (int)h; out->data = data;
     return 1;
@@ -234,9 +235,12 @@ void blit(const Tex* t, float cx, float cy, float scale, float ang, int alpha) {
 
 void gfx_init(void) {
     sceGuInit();
+    u32* vram = (u32*)sceGuGetVramBase();
+    vram_fb[0] = vram;
+    vram_fb[1] = vram + (BUF_WIDTH * SCR_HEIGHT);
     sceGuStart(GU_DIRECT, gu_list);
-    sceGuDrawBuffer(GU_PSM_8888, fb[0], BUF_WIDTH);
-    sceGuDispBuffer(SCR_WIDTH, SCR_HEIGHT, fb[1], BUF_WIDTH);
+    sceGuDrawBuffer(GU_PSM_8888, vram_fb[0], BUF_WIDTH);
+    sceGuDispBuffer(SCR_WIDTH, SCR_HEIGHT, vram_fb[1], BUF_WIDTH);
     sceGuOffset(2048 - (SCR_WIDTH / 2), 2048 - (SCR_HEIGHT / 2));
     sceGuViewport(2048, 2048, SCR_WIDTH, SCR_HEIGHT);
     sceGuScissor(0, 0, SCR_WIDTH, SCR_HEIGHT);
@@ -248,7 +252,7 @@ void gfx_init(void) {
 }
 
 void render_begin(void) {
-    g_fb = fb[g_draw];
+    g_fb = vram_fb[g_draw];
     sceGuStart(GU_DIRECT, gu_list);
 }
 
