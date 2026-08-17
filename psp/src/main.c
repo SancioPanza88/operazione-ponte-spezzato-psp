@@ -74,7 +74,25 @@ int main(int argc, char* argv[]) {
             if (pressed(&pad, PSP_CTRL_CROSS)) { issue_order_to_selected(ORD_MOVE, G.curX, G.curY); sfx_ui(); }
             if (pressed(&pad, PSP_CTRL_CIRCLE)) { issue_order_to_selected(ORD_ATTACK, G.curX, G.curY); sfx_ui(); }
             if (pressed(&pad, PSP_CTRL_TRIANGLE)) { issue_order_to_selected(ORD_DEFEND, G.curX, G.curY); sfx_ui(); }
-            if (pressed(&pad, PSP_CTRL_SQUARE)) { respawn_player(); }
+            if (pressed(&pad, PSP_CTRL_SELECT)) {
+                G.armedAbility = (G.armedAbility + 1) % ABIL_COUNT;
+                sfx_ui();
+                if (G.armedAbility > 0) {
+                    const char* anames[5] = { "ARTIGLIERIA", "ATTACCO AEREO", "PARACADUTISTI", "RIFORNIMENTO", "CARRO" };
+                    char b[64]; sprintf(b, "PRONTA: %s", anames[G.armedAbility - 1]);
+                    log_push(b);
+                } else {
+                    log_push("MODALITA RINFORZI");
+                }
+            }
+            if (pressed(&pad, PSP_CTRL_SQUARE)) {
+                if (G.armedAbility > 0) {
+                    trigger_officer_ability(G.armedAbility, G.curX, G.curY);
+                    G.armedAbility = 0;
+                } else {
+                    respawn_player();
+                }
+            }
             if (pressed(&pad, PSP_CTRL_START)) { G.state = ST_PAUSE; }
 
             game_update(dt);

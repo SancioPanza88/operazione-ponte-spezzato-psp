@@ -430,6 +430,15 @@ static void draw_world(void) {
         }
     }
 
+    // Draw bullet tracers
+    for (int i = 0; i < MAX_TRACERS; i++) {
+        Tracer* t = &tracers[i];
+        if (t->life <= 0) continue;
+        int sx1 = wsx(t->x1), sy1 = wsy(t->y1);
+        int sx2 = wsx(t->x2), sy2 = wsy(t->y2);
+        line(sx1, sy1, sx2, sy2, t->color);
+    }
+
     for (int i = 0; i < MAX_PARTICLES; i++) {
         Particle* p = &particles[i];
         if (p->life <= 0) continue;
@@ -447,22 +456,51 @@ static void draw_world(void) {
         line(cx - 9, cy, cx - 3, cy, rc); line(cx + 3, cy, cx + 9, cy, rc);
         line(cx, cy - 9, cx, cy - 3, rc); line(cx, cy + 3, cx, cy + 9, rc);
     }
+
+    // Mini radar map (bottom right, above controls)
+    int mw = 70, mh = (int)(mw * (WORLD_H / WORLD_W));
+    int mx0 = SCR_WIDTH - mw - 4, my0 = SCR_HEIGHT - mh - 18;
+    fill_rect(mx0 - 1, my0 - 1, mw + 2, mh + 2, rgb(20, 18, 12));
+    fill_rect(mx0, my0, mw, mh, rgb(43, 48, 36));
+    float msx = (float)mw / WORLD_W, msy = (float)mh / WORLD_H;
+    for (int i = 0; i < world.nBunker; i++) if (!world.bunkers[i].destroyed) pxset(mx0 + (int)(world.bunkers[i].x * msx), my0 + (int)(world.bunkers[i].y * msy), rgb(138, 128, 100));
+    for (int i = 0; i < world.nArty; i++) if (!world.artillery[i].destroyed) pxset(mx0 + (int)(world.artillery[i].x * msx), my0 + (int)(world.artillery[i].y * msy), rgb(201, 162, 39));
+    for (int i = 0; i < world.nHq; i++) if (!world.hqs[i].destroyed) pxset(mx0 + (int)(world.hqs[i].x * msx), my0 + (int)(world.hqs[i].y * msy), rgb(178, 60, 60));
+    for (int i = 0; i < unitCount; i++) {
+        if (units[i].dead) continue;
+        unsigned int uc = (units[i].faction == G.playerFaction) ? rgb(191, 247, 176) : ((units[i].faction == FAC_NPC) ? rgb(224, 86, 63) : rgb(217, 201, 138));
+        pxset(mx0 + (int)(units[i].x * msx), my0 + (int)(units[i].y * msy), uc);
+    }
 }
 
 static void draw_hud(void) {
+    // Header
     put_text(4, 4, rgb(235, 230, 200), "OPERAZIONE PONTE SPEZZATO", 1);
     char buf[80];
-    sprintf(buf, "FASE: %s", faction_name(G.playerFaction));
-    put_text(4, 16, rgb(210, 210, 180), buf, 1);
-    sprintf(buf, "OBBIETTIVI %d/%d   RINF. %d", G.missionDone, G.missionTotal, G.respawns);
-    put_text(4, 28, rgb(210, 210, 180), buf, 1);
-    if (G.respawnCd > 0) { sprintf(buf, "RINFORZI IN %d", (int)G.respawnCd + 1); put_text(4, 40, rgb(255, 180, 120), buf, 1); }
+    sprintf(buf, "COMANDO: %s", faction_name(G.playerFaction));
+    put_text(4, 15, rgb(210, 210, 180), buf, 1);
+    sprintf(buf, "OBIETTIVI: %d/%d   RINFORZI: %d", G.missionDone, G.missionTotal, G.respawns);
+    put_text(4, 26, rgb(210, 210, 180), buf, 1);
+
+    // Abilities HUD
+    const char* anames[5] = { "ARTIGL", "AEREO", "PARACAD", "RIFORN", "CARRO" };
+    for (int a = 1; a <= 5; a++) {
+        int ax = 4 + (a - 1) * 44, ay = 38;
+        fill_rect(ax, ay, 40, 11, rgb(30, 26, 16));
+        unsigned int col = (G.abilityCd[a] > 0) ? rgb(140, 130, 110) : rgb(217, 166, 79);
+        char abuf[16];
+        if (G.abilityCd[a] > 0) sprintf(abuf, "%d:%ds", a, (int)G.abilityCd[a]);
+        else sprintf(abuf, "%d:%s", a, anames[a-1]);
+        put_text(ax + 2, ay + 2, col, abuf, 1);
+    }
+
+    if (G.respawnCd > 0) { sprintf(buf, "RINFORZI IN %d", (int)G.respawnCd + 1); put_text(4, 52, rgb(255, 180, 120), buf, 1); }
 
     for (int i = 0; i < 6; i++) {
         const char* l = log_line(i);
-        if (l && l[0]) put_text(SCR_WIDTH - 150, 4 + i * 12, rgb(200, 200, 200), l, 1);
+        if (l && l[0]) put_text(SCR_WIDTH - 165, 4 + i * 11, rgb(220, 220, 200), l, 1);
     }
-    put_text(4, SCR_HEIGHT - 14, rgb(200, 200, 180), "X MUOVI O ATTACCA TR DIFENDI SQ RINF. L/R ZOOM START PAUSA", 1);
+    put_text(4, SCR_HEIGHT - 12, rgb(200, 200, 180), "X MUOVI  O ATTACCA  TR DIFENDI  SQ RINF/ABIL  L/R ZOOM", 1);
 }
 
 void render_title(void) {

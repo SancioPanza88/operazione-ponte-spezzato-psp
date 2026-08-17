@@ -34,6 +34,10 @@ int unitCount = 0;
 Mission missions[MAX_MISSIONS];
 int missionCount = 0;
 Particle particles[MAX_PARTICLES];
+Tracer tracers[MAX_TRACERS];
+Projectile projectiles[MAX_SHELLS];
+Plane planes[MAX_PLANES];
+SupplyDrop supplies[MAX_SUPPLIES];
 
 typedef struct { float x, y, r; } Placed;
 static Placed g_placed[64];
@@ -87,6 +91,17 @@ float distf(float ax, float ay, float bx, float by) {
     return (float)sqrtf(dx * dx + dy * dy);
 }
 
+int isInCover(float x, float y) {
+    for (int i = 0; i < world.nForest; i++) {
+        if (distf(x, y, world.forests[i].x, world.forests[i].y) < world.forests[i].r) return 1;
+    }
+    for (int i = 0; i < world.nHouse; i++) {
+        House* h = &world.houses[i];
+        if (x > h->x - 16 && x < h->x + h->w + 16 && y > h->y - 16 && y < h->y + h->h + 16) return 1;
+    }
+    return 0;
+}
+
 static unsigned int hashStringToSeed(const char* str) {
     unsigned int h = 2166136261u;
     while (*str) { h ^= (unsigned char)(*str); h *= 16777619u; str++; }
@@ -129,7 +144,6 @@ static void generateWorld(unsigned int seed) {
 
     int bridgeCount = w_randInt(3, 4);
     const char* blabels[4] = { "PONTE NORD", "PONTE C.NORD", "PONTE C.SUD", "PONTE SUD" };
-    (void)blabels;
     float segH = WORLD_H / bridgeCount;
     for (int i = 0; i < bridgeCount; i++) {
         float cy = segH * i + (WORLD_H / bridgeCount) * (0.28f + w_rand() * 0.44f);
@@ -139,6 +153,7 @@ static void generateWorld(unsigned int seed) {
         b->y1 = cy - 45; b->y2 = cy + 45;
         b->hp = isObj ? 300 : 0; b->maxHp = isObj ? 300 : 0;
         b->destroyed = 0; b->isObjective = isObj;
+        b->label = blabels[i];
     }
 
     int villageCount = w_randInt(2, 3);
@@ -185,6 +200,7 @@ static void generateWorld(unsigned int seed) {
         Bunker* b = &world.bunkers[world.nBunker++];
         b->x = g_px; b->y = g_py; b->r = 56;
         b->hp = 350 + w_rand() * 100; b->maxHp = b->hp; b->destroyed = 0;
+        b->label = (i == 0 ? "BUNKER A" : (i == 1 ? "BUNKER B" : "BUNKER C"));
         g_placed[g_nplaced].x = b->x; g_placed[g_nplaced].y = b->y; g_placed[g_nplaced].r = 150; g_nplaced++;
     }
 
@@ -194,6 +210,7 @@ static void generateWorld(unsigned int seed) {
         Arty* a = &world.artillery[world.nArty++];
         a->x = g_px; a->y = g_py; a->r = 40;
         a->hp = 230 + w_rand() * 70; a->maxHp = a->hp; a->destroyed = 0;
+        a->label = (i == 0 ? "ARTIGLIERIA 1" : "ARTIGLIERIA 2");
         g_placed[g_nplaced].x = a->x; g_placed[g_nplaced].y = a->y; g_placed[g_nplaced].r = 130; g_nplaced++;
     }
 
@@ -202,6 +219,7 @@ static void generateWorld(unsigned int seed) {
         Hq* h = &world.hqs[world.nHq++];
         h->x = g_px; h->y = g_py; h->r = 70;
         h->hp = 500 + w_rand() * 100; h->maxHp = h->hp; h->destroyed = 0;
+        h->label = "QUARTIER GENERALE";
         g_placed[g_nplaced].x = h->x; g_placed[g_nplaced].y = h->y; g_placed[g_nplaced].r = 170; g_nplaced++;
     }
 
@@ -245,22 +263,26 @@ static void buildMissions(void) {
         if (!b->isObjective) continue;
         Mission* m = &missions[missionCount++];
         m->kind = 0; m->cx = (b->x1 + b->x2) / 2; m->cy = (b->y1 + b->y2) / 2;
-        m->r = 50; m->hp = b->hp; m->maxHp = b->maxHp; m->destroyed = 0; m->label = "PONTE"; m->destroyer = -2;
+        m->r = 50; m->hp = b->hp; m->maxHp = b->maxHp; m->destroyed = 0; m->label = b->label; m->destroyer = -2;
+        m->type = 0;
     }
     for (int i = 0; i < world.nBunker; i++) {
         Bunker* b = &world.bunkers[i];
         Mission* m = &missions[missionCount++];
-        m->kind = 1; m->cx = b->x; m->cy = b->y; m->r = b->r; m->hp = b->hp; m->maxHp = b->maxHp; m->destroyed = 0; m->label = "BUNKER"; m->destroyer = -2;
+        m->kind = 1; m->cx = b->x; m->cy = b->y; m->r = b->r; m->hp = b->hp; m->maxHp = b->maxHp; m->destroyed = 0; m->label = b->label; m->destroyer = -2;
+        m->type = 0;
     }
     for (int i = 0; i < world.nArty; i++) {
         Arty* a = &world.artillery[i];
         Mission* m = &missions[missionCount++];
-        m->kind = 2; m->cx = a->x; m->cy = a->y; m->r = a->r; m->hp = a->hp; m->maxHp = a->maxHp; m->destroyed = 0; m->label = "ARTIGLIERIA"; m->destroyer = -2;
+        m->kind = 2; m->cx = a->x; m->cy = a->y; m->r = a->r; m->hp = a->hp; m->maxHp = a->maxHp; m->destroyed = 0; m->label = a->label; m->destroyer = -2;
+        m->type = 0;
     }
     for (int i = 0; i < world.nHq; i++) {
         Hq* h = &world.hqs[i];
         Mission* m = &missions[missionCount++];
-        m->kind = 3; m->cx = h->x; m->cy = h->y; m->r = h->r; m->hp = h->hp; m->maxHp = h->maxHp; m->destroyed = 0; m->label = "QG"; m->destroyer = -2;
+        m->kind = 3; m->cx = h->x; m->cy = h->y; m->r = h->r; m->hp = h->hp; m->maxHp = h->maxHp; m->destroyed = 0; m->label = "DIFENDI QG"; m->destroyer = -2;
+        m->type = 1; m->threshold = 90.0f; m->progress = 0; m->failed = 0;
     }
     G.missionTotal = missionCount;
 }
@@ -278,7 +300,8 @@ static void spawn_squad(int owner, int faction, float x, float y, const int* rol
         u->maxHp = d->hp; u->hp = d->hp;
         u->maxAmmo = d->maxAmmo; u->ammo = d->maxAmmo;
         u->range = d->range; u->dps = d->dps; u->speed = d->speed;
-        u->order = ORD_NONE; u->grenades = 3; u->dead = 0; u->angle = 0;
+        u->order = ORD_NONE; u->grenades = (u->role == ROLE_SOLDIER ? 3 : 0); u->dead = 0; u->angle = 0;
+        u->isTank = (u->role == ROLE_TANK);
         sprintf(u->id, "F%dU%d", faction, unitCount);
         unitCount++;
     }
@@ -291,7 +314,7 @@ void spawn_platoon(int owner, int faction, float x, float y) {
 static int nearestMissionIdx(float x, float y) {
     int best = -1; float bd = 1e18f;
     for (int i = 0; i < missionCount; i++) {
-        if (missions[i].destroyed) continue;
+        if (missions[i].destroyed || missions[i].type == 1) continue;
         float d = distf(x, y, missions[i].cx, missions[i].cy);
         if (d < bd) { bd = d; best = i; }
     }
@@ -304,6 +327,7 @@ static Unit* nearestHostileUnit(Unit* u, float maxd) {
         Unit* o = &units[i];
         if (o->dead) continue;
         if (!hostile(u->faction, o->faction)) continue;
+        if (o->isTank && u->role != ROLE_ANTITANK && u->role != ROLE_TANK) continue;
         float d = distf(u->x, u->y, o->x, o->y);
         if (d < bd) { bd = d; best = o; }
     }
@@ -326,6 +350,8 @@ static void damageMission(Mission* m, float dmg, int by) {
     m->hp -= dmg;
     if (m->hp <= 0) {
         m->hp = 0; m->destroyed = 1; m->destroyer = by;
+        if (m->type == 1) m->failed = 1;
+        if (m->kind == 0) for (int i = 0; i < world.nBridge; i++) if (distf((world.bridges[i].x1 + world.bridges[i].x2)/2, (world.bridges[i].y1 + world.bridges[i].y2)/2, m->cx, m->cy) < 20) world.bridges[i].destroyed = 1;
         if (m->kind == 1) for (int i = 0; i < world.nBunker; i++) if (!world.bunkers[i].destroyed && distf(world.bunkers[i].x, world.bunkers[i].y, m->cx, m->cy) < world.bunkers[i].r + 5) world.bunkers[i].destroyed = 1;
         if (m->kind == 2) for (int i = 0; i < world.nArty; i++) if (!world.artillery[i].destroyed && distf(world.artillery[i].x, world.artillery[i].y, m->cx, m->cy) < world.artillery[i].r + 5) world.artillery[i].destroyed = 1;
         if (m->kind == 3) for (int i = 0; i < world.nHq; i++) if (!world.hqs[i].destroyed && distf(world.hqs[i].x, world.hqs[i].y, m->cx, m->cy) < world.hqs[i].r + 5) world.hqs[i].destroyed = 1;
@@ -344,6 +370,14 @@ void add_particle(float x, float y, float vx, float vy, float life, float size, 
     p->x = x; p->y = y; p->vx = vx; p->vy = vy;
     p->life = life; p->maxLife = life; p->size = size;
     p->r = r; p->g = g; p->b = b; p->kind = kind;
+}
+
+void add_tracer(float x1, float y1, float x2, float y2, unsigned int color, float life) {
+    static int tcur = 0;
+    Tracer* t = &tracers[tcur];
+    tcur = (tcur + 1) % MAX_TRACERS;
+    t->x1 = x1; t->y1 = y1; t->x2 = x2; t->y2 = y2;
+    t->life = life; t->maxLife = life; t->color = color;
 }
 
 void add_explosion(float x, float y, float radius) {
@@ -368,6 +402,12 @@ static void update_particles(float dt) {
         else if (p->kind == 2) { p->size += 18 * dt; p->y -= 10 * dt; }
         else { p->x += p->vx * dt; p->y += p->vy * dt; p->vx *= 0.98f; p->vy *= 0.98f; }
     }
+    for (int i = 0; i < MAX_TRACERS; i++) {
+        if (tracers[i].life > 0) tracers[i].life -= dt;
+    }
+    for (int i = 0; i < MAX_PLANES; i++) {
+        if (planes[i].life > 0) planes[i].life -= dt;
+    }
 }
 
 void issue_order_to_selected(int order, float x, float y) {
@@ -376,8 +416,72 @@ void issue_order_to_selected(int order, float x, float y) {
         if (u->dead) continue;
         if (u->faction != G.playerFaction) continue;
         u->order = order; u->tx = x; u->ty = y;
+        u->fortified = 0; u->fortifyTimer = 0;
     }
     G.orderMode = order;
+}
+
+void trigger_officer_ability(int ability, float x, float y) {
+    int hasOfficer = 0, hasRadio = 0;
+    for (int i = 0; i < unitCount; i++) {
+        if (!units[i].dead && units[i].faction == G.playerFaction) {
+            if (units[i].role == ROLE_OFFICER) hasOfficer = 1;
+            if (units[i].role == ROLE_RADIOMAN) hasRadio = 1;
+        }
+    }
+    if (!hasOfficer || !hasRadio) {
+        log_push("SERVE UFFICIALE E MARCONISTA!");
+        return;
+    }
+    if (G.abilityCd[ability] > 0) {
+        log_push("ABILITA IN RICARICA!");
+        return;
+    }
+
+    if (ability == ABIL_ARTILLERY) {
+        G.abilityCd[ability] = 45.0f;
+        for (int k = 0; k < 6; k++) {
+            float ox = x + (rndf() * 100 - 50), oy = y + (rndf() * 100 - 50);
+            add_explosion(ox, oy, 55);
+            for (int i = 0; i < unitCount; i++) {
+                if (!units[i].dead && distf(units[i].x, units[i].y, ox, oy) < 65) units[i].hp -= 70;
+            }
+        }
+        sfx_explosion();
+        G.shake = 5.0f;
+        log_push("BARRAGE ARTIGLIERIA!");
+    } else if (ability == ABIL_AIRSTRIKE) {
+        G.abilityCd[ability] = 50.0f;
+        for (int k = 0; k < 3; k++) {
+            float ox = x + (k - 1) * 40, oy = y;
+            add_explosion(ox, oy, 50);
+            for (int i = 0; i < unitCount; i++) {
+                if (!units[i].dead && distf(units[i].x, units[i].y, ox, oy) < 50) units[i].hp -= 85;
+            }
+        }
+        sfx_explosion();
+        G.shake = 4.0f;
+        log_push("ATTACCO AEREO!");
+    } else if (ability == ABIL_PARATROOP) {
+        G.abilityCd[ability] = 60.0f;
+        int pr[2] = { ROLE_SOLDIER, ROLE_SOLDIER };
+        spawn_squad(1, G.playerFaction, x, y, pr, 2);
+        log_push("PARACADUTISTI LANCIATI!");
+    } else if (ability == ABIL_RESUPPLY) {
+        G.abilityCd[ability] = 40.0f;
+        for (int i = 0; i < unitCount; i++) {
+            if (!units[i].dead && units[i].faction == G.playerFaction && distf(units[i].x, units[i].y, x, y) < 120) {
+                units[i].ammo = units[i].maxAmmo;
+                if (units[i].role == ROLE_SOLDIER) units[i].grenades = 3;
+            }
+        }
+        log_push("MUNIZIONI RIFORNITE!");
+    } else if (ability == ABIL_TANK) {
+        G.abilityCd[ability] = 90.0f;
+        int tr[1] = { ROLE_TANK };
+        spawn_squad(1, G.playerFaction, x, y, tr, 1);
+        log_push("CARRO RINFORZO SCHIERATO!");
+    }
 }
 
 void game_init(void) {
@@ -389,6 +493,7 @@ void game_init(void) {
     G.zoom = 1;
     G.respawns = 5;
     G.respawnCd = -1;
+    for (int i = 0; i < ABIL_COUNT; i++) G.abilityCd[i] = 0;
 }
 
 void game_new_battle(int playerFaction) {
@@ -397,8 +502,13 @@ void game_new_battle(int playerFaction) {
     memset(units, 0, sizeof(units));
     memset(particles, 0, sizeof(particles));
     memset(missions, 0, sizeof(missions));
+    memset(tracers, 0, sizeof(tracers));
+    memset(projectiles, 0, sizeof(projectiles));
+    memset(planes, 0, sizeof(planes));
+    memset(supplies, 0, sizeof(supplies));
     buildMissions();
     G.missionDone = 0;
+    for (int i = 0; i < ABIL_COUNT; i++) G.abilityCd[i] = 0;
 
     int villageCount = 0;
     for (int i = 0; i < world.nHouse; i++) { if (world.houses[i].villageId + 1 > villageCount) villageCount = world.houses[i].villageId + 1; }
@@ -457,21 +567,27 @@ void game_update(float dt) {
     G.time += dt;
     if (G.shake > 0) G.shake = (float)fmaxf(0, G.shake - dt * 6);
 
+    for (int i = 0; i < ABIL_COUNT; i++) {
+        if (G.abilityCd[i] > 0) G.abilityCd[i] -= dt;
+    }
+
     float aura[MAX_UNITS];
-    for (int i = 0; i < unitCount; i++) aura[i] = 1;
+    for (int i = 0; i < unitCount; i++) aura[i] = 1.0f;
     for (int i = 0; i < unitCount; i++) {
         Unit* o = &units[i];
         if (o->dead || o->role != ROLE_OFFICER) continue;
         for (int j = 0; j < unitCount; j++) {
             Unit* v = &units[j];
             if (v->dead || v->faction != o->faction) continue;
-            if (distf(o->x, o->y, v->x, v->y) < ROLE_DEFS[ROLE_OFFICER].auraRange) aura[j] = 1 + ROLE_DEFS[ROLE_OFFICER].auraBoost;
+            if (distf(o->x, o->y, v->x, v->y) < ROLE_DEFS[ROLE_OFFICER].auraRange) aura[j] = 1.0f + ROLE_DEFS[ROLE_OFFICER].auraBoost;
         }
     }
 
     for (int i = 0; i < unitCount; i++) {
         Unit* u = &units[i];
         if (u->dead) continue;
+
+        if (u->suppressedUntil > 0) u->suppressedUntil -= dt;
 
         if (u->role == ROLE_MEDIC) {
             for (int j = 0; j < unitCount; j++) {
@@ -495,10 +611,17 @@ void game_update(float dt) {
         if (tu && distf(u->x, u->y, tu->x, tu->y) <= u->range) {
             u->angle = (float)atan2f(tu->y - u->y, tu->x - u->x);
             if (u->ammo > 0) {
-                tu->hp -= u->dps * aura[i] * dt;
+                float coverMul = isInCover(tu->x, tu->y) ? 0.6f : 1.0f;
+                float suppMul = (u->suppressedUntil > 0) ? 0.5f : 1.0f;
+                float atBonus = (u->role == ROLE_ANTITANK && tu->isTank) ? 8.0f : 1.0f;
+                tu->hp -= u->dps * aura[i] * coverMul * suppMul * atBonus * dt;
                 u->ammo -= dt * 2.5f;
                 fired = 1;
-                if (u->shootCd <= 0) { u->shootCd = 0.12f; add_particle(u->x + cosf(u->angle) * 12, u->y + sinf(u->angle) * 12, 0, 0, 0.09f, 6, 1, 0.9f, 0.6f, 3); sfx_shot(); }
+                if (u->shootCd <= 0) {
+                    u->shootCd = (u->role == ROLE_SNIPER ? 0.8f : (u->role == ROLE_SUPPORT ? 0.08f : 0.16f));
+                    add_tracer(u->x, u->y, tu->x, tu->y, (u->faction == FAC_NPC ? 0xff3b48e0 : 0xff7ad2ff), 0.12f);
+                    sfx_shot();
+                }
             }
         } else if (tm && distf(u->x, u->y, tm->cx, tm->cy) <= u->range) {
             u->angle = (float)atan2f(tm->cy - u->y, tm->cx - u->x);
@@ -506,7 +629,11 @@ void game_update(float dt) {
                 damageMission(tm, u->dps * aura[i] * dt, u->faction);
                 u->ammo -= dt * 2.5f;
                 fired = 1;
-                if (u->shootCd <= 0) { u->shootCd = 0.12f; sfx_shot(); }
+                if (u->shootCd <= 0) {
+                    u->shootCd = 0.16f;
+                    add_tracer(u->x, u->y, tm->cx, tm->cy, (u->faction == FAC_NPC ? 0xff3b48e0 : 0xff7ad2ff), 0.12f);
+                    sfx_shot();
+                }
             }
         } else {
             float gx = -1, gy = -1;
@@ -535,18 +662,18 @@ void game_update(float dt) {
         }
 
         if (u->shootCd > 0) u->shootCd -= dt;
-        if (fired) { if (u->shootCd <= 0) u->shootCd = 0.12f; }
-        else u->ammo = (float)fminf(u->maxAmmo, u->ammo + dt * 3.0f);
+        if (!fired) u->ammo = (float)fminf(u->maxAmmo, u->ammo + dt * 3.0f);
 
         if ((u->role == ROLE_SOLDIER || u->role == ROLE_SUPPORT) && u->grenades > 0 && u->grenadeCd <= 0) {
             Unit* gu = nearestHostileUnit(u, 140);
-            if (gu) {
+            if (gu && !gu->isTank) {
                 for (int j = 0; j < unitCount; j++) {
                     Unit* e = &units[j];
                     if (e->dead || !hostile(u->faction, e->faction)) continue;
                     if (distf(gu->x, gu->y, e->x, e->y) < 45) e->hp -= 55;
                 }
                 add_explosion(gu->x, gu->y, 45);
+                sfx_explosion();
                 u->grenades--; u->grenadeCd = 5.5f;
             }
         }
@@ -562,7 +689,13 @@ void game_update(float dt) {
     update_particles(dt);
 
     int done = 0, alivePlayer = 0;
-    for (int i = 0; i < missionCount; i++) if (missions[i].destroyed) done++;
+    for (int i = 0; i < missionCount; i++) {
+        if (missions[i].type == 1 && !missions[i].destroyed) {
+            missions[i].progress += dt;
+            if (missions[i].progress >= missions[i].threshold) missions[i].destroyed = 1; // Completed defend objective
+        }
+        if (missions[i].destroyed && !missions[i].failed) done++;
+    }
     G.missionDone = done;
     for (int i = 0; i < unitCount; i++) if (!units[i].dead && units[i].faction == G.playerFaction) alivePlayer++;
 
@@ -587,3 +720,4 @@ void respawn_player(void) {
     G.respawnCd = -1;
     log_push("RINFORZI SCHIERATI");
 }
+
