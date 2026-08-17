@@ -1,4 +1,5 @@
 #include "game.h"
+#include "assets_embedded.h"
 
 #define BUF_WIDTH 512
 #define SCR_WIDTH 480
@@ -154,9 +155,30 @@ static int onscreen(int sx, int sy, int m) {
     return !(sx < -m || sy < -m || sx > SCR_WIDTH + m || sy > SCR_HEIGHT + m);
 }
 
+static const unsigned char* find_embedded(const char* name, unsigned int* size) {
+    for (int i = 0; i < g_embedded_asset_count; i++) {
+        if (strcmp(g_embedded_assets[i].name, name) == 0) {
+            *size = g_embedded_assets[i].size;
+            return g_embedded_assets[i].data;
+        }
+    }
+    return 0;
+}
+
 static int load_rgba(const char* path, Tex* out) {
     out->data = 0; out->w = 0; out->h = 0;
     char tmp[96];
+    unsigned int esize = 0;
+    const unsigned char* em = find_embedded(path, &esize);
+    if (em && esize >= 8) {
+        unsigned int w = (unsigned int)em[0] | ((unsigned int)em[1] << 8) | ((unsigned int)em[2] << 16) | ((unsigned int)em[3] << 24);
+        unsigned int h = (unsigned int)em[4] | ((unsigned int)em[5] << 8) | ((unsigned int)em[6] << 16) | ((unsigned int)em[7] << 24);
+        if ((size_t)w * h * 4 <= esize - 8) {
+            out->w = (int)w; out->h = (int)h;
+            out->data = (unsigned char*)em + 8;
+            return 1;
+        }
+    }
     FILE* fp = fopen(path, "rb");
     if (!fp) { sprintf(tmp, "MISSING %s", path); log_push(tmp); return 0; }
     unsigned int w = 0, h = 0;

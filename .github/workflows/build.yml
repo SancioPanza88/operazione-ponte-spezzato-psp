@@ -31,6 +31,38 @@ jobs:
               print('converted', p, im.size)
           PY
 
+      - name: Embed assets into EBOOT source
+        run: |
+          python3 - <<'PY'
+          import glob
+          files = sorted(glob.glob('psp/assets/*.rgba'))
+          out = ['/* generated - embedded RGBA assets */']
+          out.append('typedef struct { const char* name; const unsigned char* data; unsigned int size; } EmbeddedAsset;')
+          entries = []
+          for i, f in enumerate(files):
+              data = open(f, 'rb').read()
+              name = 'assets/' + f.split('/')[-1]
+              out.append('static const unsigned char _emb_%d[] = {' % i)
+              line = []
+              for b in data:
+                  line.append('0x%02x' % b)
+                  if len(line) == 12:
+                      out.append('  ' + ', '.join(line) + ',')
+                      line = []
+              if line:
+                  out.append('  ' + ', '.join(line) + ',')
+              out.append('};')
+              entries.append((name, '_emb_%d' % i, len(data)))
+          out.append('const EmbeddedAsset g_embedded_assets[] = {')
+          for name, sym, sz in entries:
+              out.append('  { "%s", %s, %u },' % (name, sym, sz))
+          out.append('};')
+          out.append('const int g_embedded_asset_count = %d;' % len(entries))
+          with open('psp/src/assets_embedded.h', 'w') as f:
+              f.write('\n'.join(out))
+          print('embedded', len(entries), 'assets')
+          PY
+
       - name: Build EBOOT.PBP
         run: make -C psp/src
 
@@ -38,7 +70,6 @@ jobs:
         run: |
           mkdir -p OPSPEZZATO
           cp psp/src/EBOOT.PBP OPSPEZZATO/
-          cp -r psp/assets OPSPEZZATO/assets
 
       - name: Upload OPSPEZZATO
         uses: actions/upload-artifact@v4
