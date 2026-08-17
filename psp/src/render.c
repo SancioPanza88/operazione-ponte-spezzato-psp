@@ -235,7 +235,7 @@ void blit(const Tex* t, float cx, float cy, float scale, float ang, int alpha) {
 
 void gfx_init(void) {
     sceGuInit();
-    u32* vram = (u32*)sceGuGetVramBase();
+    u32* vram = (u32*)0x04000000;
     vram_fb[0] = vram;
     vram_fb[1] = vram + (BUF_WIDTH * SCR_HEIGHT);
     sceGuStart(GU_DIRECT, gu_list);
