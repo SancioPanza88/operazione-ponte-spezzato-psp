@@ -409,6 +409,10 @@ void render_title(void) {
         if (i == G.factionCursor) put_text_centered(SCR_WIDTH / 2, y - 12, rgb(255, 235, 120), "<", 1);
     }
     put_text_centered(SCR_WIDTH / 2, SCR_HEIGHT - 18, rgb(180, 200, 180), "D-PAD SCEGLI  X CONFERMA", 1);
+    const char* e0 = log_line(0);
+    const char* e1 = log_line(1);
+    if (e0 && e0[0]) put_text(8, 92, rgb(235, 140, 120), e0, 1);
+    if (e1 && e1[0]) put_text(8, 104, rgb(235, 140, 120), e1, 1);
 }
 
 void render_play(void) {
