@@ -578,7 +578,7 @@ void game_update(float dt) {
 }
 
 void respawn_player(void) {
-    if (G.respawns <= 0 || G.respawnCd > 0) return;
+    if (G.respawns <= 0) return;
     int f = G.playerFaction;
     spawn_platoon(f, f, FAC_INFO[f].sx, FAC_INFO[f].sy);
     int base = unitCount - 7;

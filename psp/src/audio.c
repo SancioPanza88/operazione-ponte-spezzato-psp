@@ -41,7 +41,8 @@ static short gen_voice(int type, int i) {
         return (short)((float)sinf(2 * 3.14159265f * freq * t) * env * 3500.0f);
     }
     float t = (float)i / SR;
-    return (short)(((t * 330.0f * 2) > 1 ? 1 : 0) * 2 - 1) * 3000;
+    float phase = t * 330.0f;
+    return (short)((fmodf(phase, 1.0f) < 0.5f ? 1 : -1) * 3000);
 }
 
 static void enqueue(int type, float vol) {

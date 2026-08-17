@@ -24,6 +24,8 @@ jobs:
           from PIL import Image
           for p in sorted(glob.glob('psp/assets/*.png')):
               im = Image.open(p).convert('RGBA')
+              # PSP has limited RAM (24MB usable); downscale large textures to PSP-friendly sizes
+              im.thumbnail((128, 128), Image.Resampling.LANCZOS)
               w, h = im.size
               with open(p[:-4] + '.rgba', 'wb') as f:
                   f.write(struct.pack('<II', w, h))
