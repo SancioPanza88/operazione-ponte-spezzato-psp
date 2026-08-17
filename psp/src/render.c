@@ -339,53 +339,152 @@ static void draw_world(void) {
     if (wr2 > SCR_WIDTH) wr2 = SCR_WIDTH;
     if (wr2 > wr1) fill_rect(wr1, 0, wr2 - wr1, SCR_HEIGHT, waterCol);
 
+    // Bridges
     for (int i = 0; i < world.nBridge; i++) {
         Bridge* b = &world.bridges[i];
-        float cx = (b->x1 + b->x2) / 2, cy = (b->y1 + b->y2) / 2;
-        int sx = wsx(cx), sy = wsy(cy);
-        if (!onscreen(sx, sy, 80)) continue;
-        float sc = (b->x2 - b->x1) * G.zoom / (float)(tex_bridge[0].w > 0 ? tex_bridge[0].w : 1);
-        blit(&tex_bridge[0], (float)sx, (float)sy, sc, 0, 255);
-    }
-
-    for (int i = 0; i < world.nHouse; i++) {
-        House* h = &world.houses[i];
-        float cx = h->x + h->w / 2, cy = h->y + h->h / 2;
-        int sx = wsx(cx), sy = wsy(cy);
-        if (!onscreen(sx, sy, 60)) continue;
-        blit(&tex_house, (float)sx, (float)sy, sscale((h->w > h->h ? h->w : h->h), &tex_house), 0, 255);
-    }
-
-    for (int i = 0; i < world.nForest; i++) {
-        Forest* f = &world.forests[i];
-        for (int j = 0; j < f->ntree; j++) {
-            float tx = f->x + f->trees[j * 2], ty = f->y + f->trees[j * 2 + 1];
-            int sx = wsx(tx), sy = wsy(ty);
-            if (!onscreen(sx, sy, 30)) continue;
-            blit(&tex_tree[j & 1], (float)sx, (float)sy, sscale(26, &tex_tree[j & 1]), 0, 255);
+        int bx1 = wsx(b->x1), bx2 = wsx(b->x2);
+        int by1 = wsy(b->y1), by2 = wsy(b->y2);
+        int bw = bx2 - bx1, bh = by2 - by1;
+        if (bw > 0 && bh > 0 && onscreen((bx1 + bx2) / 2, (by1 + by2) / 2, 80)) {
+            if (tex_bridge[b->destroyed ? 1 : 0].data) {
+                float sc = (float)bw / (tex_bridge[0].w > 0 ? tex_bridge[0].w : 1);
+                blit(&tex_bridge[b->destroyed ? 1 : 0], (float)(bx1 + bx2) / 2.0f, (float)(by1 + by2) / 2.0f, sc, 0, 255);
+            } else {
+                if (b->destroyed) {
+                    fill_rect(bx1, by1 + bh / 3, bw / 3, bh / 3, rgb(74, 58, 34));
+                    fill_rect(bx2 - bw / 3, by1 + bh / 3, bw / 3, bh / 3, rgb(74, 58, 34));
+                } else {
+                    fill_rect(bx1, by1, bw, bh, rgb(181, 144, 92));
+                    fill_rect(bx1, by1, bw, 3, rgb(92, 69, 39));
+                    fill_rect(bx1, by2 - 3, bw, 3, rgb(92, 69, 39));
+                    for (int py = by1 + 4; py < by2 - 3; py += 6) {
+                        line(bx1, py, bx2, py, rgb(96, 72, 42));
+                    }
+                }
+            }
         }
     }
 
-    for (int i = 0; i < world.nBunker; i++) {
-        Bunker* b = &world.bunkers[i];
-        int sx = wsx(b->x), sy = wsy(b->y);
-        if (onscreen(sx, sy, 50)) blit(&tex_bunker[b->destroyed ? 1 : 0], (float)sx, (float)sy, sscale(2 * b->r, &tex_bunker[0]), 0, 255);
-    }
-    for (int i = 0; i < world.nArty; i++) {
-        Arty* a = &world.artillery[i];
-        int sx = wsx(a->x), sy = wsy(a->y);
-        if (onscreen(sx, sy, 50)) blit(&tex_arty[a->destroyed ? 1 : 0], (float)sx, (float)sy, sscale(2 * a->r, &tex_arty[0]), 0, 255);
-    }
-    for (int i = 0; i < world.nHq; i++) {
-        Hq* h = &world.hqs[i];
-        int sx = wsx(h->x), sy = wsy(h->y);
-        if (onscreen(sx, sy, 70)) blit(&tex_hq[h->destroyed ? 1 : 0], (float)sx, (float)sy, sscale(2 * h->r, &tex_hq[0]), 0, 255);
+    // Houses
+    for (int i = 0; i < world.nHouse; i++) {
+        House* h = &world.houses[i];
+        int hx = wsx(h->x), hy = wsy(h->y);
+        int hw = (int)(h->w * G.zoom), hh = (int)(h->h * G.zoom);
+        if (onscreen(hx + hw / 2, hy + hh / 2, 60)) {
+            if (tex_house.data) {
+                blit(&tex_house, (float)(hx + hw / 2), (float)(hy + hh / 2), sscale(h->w > h->h ? h->w : h->h, &tex_house), 0, 255);
+            } else {
+                // Procedural house
+                fill_rect(hx + 2, hy + 2, hw, hh, rgb(20, 18, 12)); // shadow
+                fill_rect(hx, hy, hw, hh, rgb(154, 140, 102)); // wall
+                fill_rect(hx, hy, hw, hh / 3, rgb(90, 74, 54)); // roof
+                fill_rect(hx + hw / 3, hy + hh / 2, hw / 3, hh / 2, rgb(46, 42, 32)); // door
+            }
+        }
     }
 
+    // Forests & Trees
+    for (int i = 0; i < world.nForest; i++) {
+        Forest* f = &world.forests[i];
+        int fx = wsx(f->x), fy = wsy(f->y), fr = (int)(f->r * G.zoom);
+        if (onscreen(fx, fy, fr + 20)) {
+            draw_circle(fx, fy, fr, rgb(35, 55, 25));
+            for (int j = 0; j < f->ntree; j++) {
+                float tx = f->x + f->trees[j * 2], ty = f->y + f->trees[j * 2 + 1];
+                int sx = wsx(tx), sy = wsy(ty);
+                if (!onscreen(sx, sy, 30)) continue;
+                if (tex_tree[j & 1].data) {
+                    blit(&tex_tree[j & 1], (float)sx, (float)sy, sscale(26, &tex_tree[j & 1]), 0, 255);
+                } else {
+                    draw_disc(sx, sy, (int)(7 * G.zoom), (j & 1) ? rgb(44, 74, 34) : rgb(60, 97, 48));
+                }
+            }
+        }
+    }
+
+    // Bunkers
+    for (int i = 0; i < world.nBunker; i++) {
+        Bunker* b = &world.bunkers[i];
+        int sx = wsx(b->x), sy = wsy(b->y), br = (int)(b->r * G.zoom);
+        if (!onscreen(sx, sy, br + 20)) continue;
+        if (tex_bunker[b->destroyed ? 1 : 0].data) {
+            blit(&tex_bunker[b->destroyed ? 1 : 0], (float)sx, (float)sy, sscale(2 * b->r, &tex_bunker[0]), 0, 255);
+        } else {
+            // Procedural bunker (circular sandbags + concrete dome + firing slit)
+            draw_disc(sx + 3, sy + 3, br, rgb(20, 18, 12));
+            draw_disc(sx, sy, br, b->destroyed ? rgb(70, 66, 58) : rgb(138, 134, 118));
+            draw_circle(sx, sy, br, rgb(35, 33, 27));
+            if (!b->destroyed) {
+                int slitW = (int)(18 * G.zoom), slitH = (int)(6 * G.zoom);
+                fill_rect(sx - slitW / 2, sy - slitH / 2, slitW, slitH, rgb(21, 19, 14));
+                line(sx, sy, sx + (b->x < WORLD_W / 2 ? br : -br), sy, rgb(44, 44, 38));
+            } else {
+                line(sx - br / 2, sy - br / 2, sx + br / 2, sy + br / 2, rgb(21, 19, 14));
+                line(sx + br / 2, sy - br / 2, sx - br / 2, sy + br / 2, rgb(21, 19, 14));
+            }
+        }
+    }
+
+    // Artillery
+    for (int i = 0; i < world.nArty; i++) {
+        Arty* a = &world.artillery[i];
+        int sx = wsx(a->x), sy = wsy(a->y), ar = (int)(a->r * G.zoom);
+        if (!onscreen(sx, sy, ar + 20)) continue;
+        if (tex_arty[a->destroyed ? 1 : 0].data) {
+            blit(&tex_arty[a->destroyed ? 1 : 0], (float)sx, (float)sy, sscale(2 * a->r, &tex_arty[0]), 0, 255);
+        } else {
+            // Procedural artillery (circular pit + barrel)
+            draw_disc(sx + 2, sy + 2, ar, rgb(20, 18, 12));
+            draw_disc(sx, sy, ar, a->destroyed ? rgb(70, 66, 58) : rgb(125, 115, 99));
+            draw_circle(sx, sy, ar, rgb(35, 33, 27));
+            if (!a->destroyed) {
+                int gunLen = (int)(ar * 1.3f);
+                int dir = (a->x < WORLD_W / 2 ? 1 : -1);
+                line(sx, sy, sx + gunLen * dir, sy - 2, rgb(28, 26, 21));
+                line(sx, sy + 1, sx + gunLen * dir, sy - 1, rgb(58, 53, 44));
+            } else {
+                line(sx - ar / 2, sy - ar / 2, sx + ar / 2, sy + ar / 2, rgb(21, 19, 14));
+            }
+        }
+    }
+
+    // HQ (Quartier Generale)
+    for (int i = 0; i < world.nHq; i++) {
+        Hq* h = &world.hqs[i];
+        int sx = wsx(h->x), sy = wsy(h->y), hr = (int)(h->r * G.zoom);
+        if (!onscreen(sx, sy, hr + 20)) continue;
+        if (tex_hq[h->destroyed ? 1 : 0].data) {
+            blit(&tex_hq[h->destroyed ? 1 : 0], (float)sx, (float)sy, sscale(2 * h->r, &tex_hq[0]), 0, 255);
+        } else {
+            // Procedural HQ building
+            int hw = (int)(hr * 1.6f), hh = (int)(hr * 1.1f);
+            fill_rect(sx - hw / 2 + 3, sy - hh / 2 + 3, hw, hh, rgb(20, 18, 12));
+            fill_rect(sx - hw / 2, sy - hh / 2, hw, hh, h->destroyed ? rgb(58, 54, 48) : rgb(138, 128, 104));
+            fill_rect(sx - hw / 2, sy - hh / 2, hw, hh / 4, rgb(90, 74, 54)); // roof
+            if (!h->destroyed) {
+                fill_rect(sx - 4, sy + hh / 4, 8, hh / 4, rgb(30, 26, 16)); // door
+                // Flag
+                line(sx + hw / 3, sy - hh / 2, sx + hw / 3, sy - hh / 2 - 16, rgb(40, 36, 26));
+                fill_rect(sx + hw / 3, sy - hh / 2 - 16, 10, 6, rgb(140, 47, 47));
+            } else {
+                line(sx - hw / 2, sy - hh / 2, sx + hw / 2, sy + hh / 2, rgb(21, 19, 14));
+                line(sx + hw / 2, sy - hh / 2, sx - hw / 2, sy + hh / 2, rgb(21, 19, 14));
+            }
+        }
+    }
+
+    // Minefields
     for (int i = 0; i < world.nMine; i++) {
         Mine* m = &world.mines[i];
-        int sx = wsx(m->x), sy = wsy(m->y);
-        if (onscreen(sx, sy, 60)) draw_circle(sx, sy, (int)(m->r * G.zoom), rgb(140, 90, 30));
+        int sx = wsx(m->x), sy = wsy(m->y), mr = (int)(m->r * G.zoom);
+        if (onscreen(sx, sy, mr + 20)) {
+            draw_circle(sx, sy, mr, rgb(192, 57, 43));
+            for (int k = 0; k < m->n; k++) {
+                int mkx = sx + (int)(m->markers[k * 2] * G.zoom);
+                int mky = sy + (int)(m->markers[k * 2 + 1] * G.zoom);
+                pxset(mkx, mky, rgb(42, 38, 32));
+            }
+        }
     }
 
     for (int i = 0; i < unitCount; i++) {
