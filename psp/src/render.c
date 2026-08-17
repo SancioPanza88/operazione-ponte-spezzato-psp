@@ -239,8 +239,8 @@ void gfx_init(void) {
     vram_fb[0] = vram;
     vram_fb[1] = vram + (BUF_WIDTH * SCR_HEIGHT);
     sceGuStart(GU_DIRECT, gu_list);
-    sceGuDrawBuffer(GU_PSM_8888, vram_fb[0], BUF_WIDTH);
-    sceGuDispBuffer(SCR_WIDTH, SCR_HEIGHT, vram_fb[1], BUF_WIDTH);
+    sceGuDrawBuffer(GU_PSM_8888, (void*)0, BUF_WIDTH);
+    sceGuDispBuffer(SCR_WIDTH, SCR_HEIGHT, (void*)(BUF_WIDTH * SCR_HEIGHT * 4), BUF_WIDTH);
     sceGuOffset(2048 - (SCR_WIDTH / 2), 2048 - (SCR_HEIGHT / 2));
     sceGuViewport(2048, 2048, SCR_WIDTH, SCR_HEIGHT);
     sceGuScissor(0, 0, SCR_WIDTH, SCR_HEIGHT);
